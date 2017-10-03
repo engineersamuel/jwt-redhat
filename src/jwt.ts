@@ -234,6 +234,9 @@ const origin = location.hostname;
 
 const token = lib.store.local.get(TOKEN_NAME) || lib.getCookieValue(TOKEN_NAME);
 const refreshToken = lib.store.local.get(REFRESH_TOKEN_NAME);
+let currentRefreshTokenFailures = 0;
+// Number of times to let the token refresh fail before intervening
+const failedRefreshLimit = 2;
 
 if (token && token !== 'undefined') { KEYCLOAK_INIT_OPTIONS.token = token; }
 if (refreshToken) { KEYCLOAK_INIT_OPTIONS.refreshToken = refreshToken; }
@@ -575,6 +578,7 @@ function refreshLoop() {
  */
 function updateTokenSuccess(refreshed: boolean) {
     log('[jwt.js] updateTokenSuccess, token was ' + ['not ', ''][~~refreshed] + 'refreshed');
+    currentRefreshTokenFailures = 0;
     setToken(state.keycloak.token);
     setRefreshToken(state.keycloak.refreshToken);
     // setRavenUserContext();
@@ -588,6 +592,12 @@ function updateTokenSuccess(refreshed: boolean) {
  */
 function updateTokenFailure(load_failure) {
     log('[jwt.js] updateTokenFailure');
+    currentRefreshTokenFailures += 1;
+    if (currentRefreshTokenFailures >= failedRefreshLimit) {
+        log(`[jwt.js] The token has failed to refresh at least ${failedRefreshLimit} times, removing token and refresh token`);
+        removeToken();
+        removeRefreshToken();
+    }
 }
 
 /**
